@@ -1,0 +1,54 @@
+# AIWaveBrief 配置文件
+
+scraping:
+  max_retries: 3
+  retry_delay_seconds: 5
+  request_delay_seconds: 2
+  max_articles_per_source: 10
+
+summarization:
+  model: "gpt-4o"
+  max_tokens_per_summary: 500
+  max_tokens_brief: 4000
+  temperature: 0.3
+  content_max_chars: 6000
+
+output:
+  base_dir: "output"
+  brief_template: "templates/brief_template.md"
+
+sources:
+  - name: "arXiv AI"
+    url: "https://arxiv.org/list/cs.AI/recent"
+    category: "research"
+    enabled: true
+
+  - name: "arXiv Machine Learning"
+    url: "https://arxiv.org/list/cs.LG/recent"
+    category: "research"
+    enabled: true
+
+  - name: "OpenAI Blog"
+    url: "https://openai.com/blog"
+    category: "industry"
+    enabled: true
+
+  - name: "Google AI Blog"
+    url: "https://blog.google/technology/ai/"
+    category: "industry"
+    enabled: true
+
+  - name: "Anthropic News"
+    url: "https://www.anthropic.com/news"
+    category: "industry"
+    enabled: true
+
+  - name: "TechCrunch AI"
+    url: "https://techcrunch.com/category/artificial-intelligence/"
+    category: "news"
+    enabled: true
+
+  - name: "The Verge AI"
+    url: "https://www.theverge.com/ai-artificial-intelligence"
+    category: "news"
+    enabled: true
