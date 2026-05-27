@@ -5,6 +5,7 @@ scraping:
   retry_delay_seconds: 5
   request_delay_seconds: 2
   max_articles_per_source: 10
+  max_workers: 3
 
 summarization:
   model: "gpt-4o"
@@ -16,6 +17,42 @@ summarization:
 output:
   base_dir: "output"
   brief_template: "templates/brief_template.md"
+
+schedule:
+  enabled: false
+  time: "08:00"
+  timezone: "Asia/Shanghai"
+
+dedup:
+  enabled: true
+  db_path: "data/dedup.db"
+  url_ttl_days: 30
+  title_similarity_threshold: 0.85
+
+push:
+  enabled: false
+  channels:
+    - type: email
+      smtp_host: ""
+      smtp_port: 465
+      smtp_ssl: true
+      smtp_user: ""
+      smtp_password: ""
+      from_addr: ""
+      to_addrs: []
+    - type: webhook
+      url: ""
+      headers: {}
+
+history:
+  enabled: true
+  db_path: "data/history.db"
+  keep_days: 90
+
+logging:
+  level: "INFO"
+  format: "structured"
+  file: "data/aiwavebrief.log"
 
 sources:
   - name: "arXiv AI"

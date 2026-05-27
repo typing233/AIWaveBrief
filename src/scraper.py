@@ -1,13 +1,17 @@
 import logging
 import os
+import random
 import re
+import threading
 import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 from firecrawl import FirecrawlApp
 
-from .models import ScrapedArticle, SourceConfig
+from .models import AppConfig, ScrapedArticle, SourceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +21,35 @@ ARTICLE_LINK_PATTERNS = {
     "news": [r"/\d{4}/\d{2}/\d{2}/", r"/article/", r"/news/"],
 }
 
+RETRIABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
 
 class ArticleScraper:
-    def __init__(self, config: dict):
+    def __init__(self, config: AppConfig):
         self.client = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
-        scraping_cfg = config.get("scraping", {})
-        self.max_retries = scraping_cfg.get("max_retries", 3)
-        self.delay = scraping_cfg.get("request_delay_seconds", 2)
-        self.max_articles_per_source = scraping_cfg.get("max_articles_per_source", 10)
+        self.max_retries = config.scraping.max_retries
+        self.delay = config.scraping.request_delay_seconds
+        self.max_articles_per_source = config.scraping.max_articles_per_source
+        self.max_workers = config.scraping.max_workers
+        self._domain_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
+        self._domain_last_request: dict[str, float] = {}
+
+    def scrape_all_sources(self, sources: list[SourceConfig]) -> list[ScrapedArticle]:
+        all_articles = []
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(self.scrape_source, source): source
+                for source in sources
+            }
+            for future in as_completed(futures):
+                source = futures[future]
+                try:
+                    articles = future.result()
+                    all_articles.extend(articles)
+                    logger.info(f"  {source.name}: 获取 {len(articles)} 篇文章")
+                except Exception as e:
+                    logger.error(f"  {source.name} 抓取失败: {e}")
+        return all_articles
 
     def scrape_source(self, source: SourceConfig) -> list[ScrapedArticle]:
         index_doc = self._scrape_url(source.url)
@@ -37,7 +62,7 @@ class ArticleScraper:
 
         articles = []
         for link in links[: self.max_articles_per_source]:
-            time.sleep(self.delay)
+            self._rate_limit(link)
             doc = self._scrape_url(link)
             if not doc:
                 continue
@@ -76,10 +101,19 @@ class ArticleScraper:
             )
         return articles
 
+    def _rate_limit(self, url: str):
+        domain = urlparse(url).netloc
+        with self._domain_locks[domain]:
+            last = self._domain_last_request.get(domain, 0)
+            elapsed = time.time() - last
+            if elapsed < self.delay:
+                time.sleep(self.delay - elapsed)
+            self._domain_last_request[domain] = time.time()
+
     def _scrape_url(self, url: str):
-        """Scrape a single URL via Firecrawl v2 API. Returns a Document or None."""
         for attempt in range(self.max_retries):
             try:
+                self._rate_limit(url)
                 doc = self.client.scrape_url(
                     url,
                     formats=["markdown"],
@@ -91,17 +125,20 @@ class ArticleScraper:
                 logger.warning(f"Empty content returned for {url}")
                 return None
             except Exception as e:
-                wait = 2**attempt
+                error_msg = str(e)
+                if "404" in error_msg or "403" in error_msg:
+                    logger.warning(f"Permanent error for {url}: {e}")
+                    return None
+                wait = (2**attempt) + random.uniform(0, 1)
                 logger.warning(
                     f"Scrape attempt {attempt + 1}/{self.max_retries} failed for {url}: {e}. "
-                    f"Retrying in {wait}s..."
+                    f"Retrying in {wait:.1f}s..."
                 )
                 time.sleep(wait)
         logger.error(f"All scrape attempts failed for {url}")
         return None
 
     def _extract_article_links(self, doc, source: SourceConfig) -> list[str]:
-        """Extract article URLs from an index page Document."""
         markdown = doc.markdown or ""
 
         raw_links = re.findall(r"\[([^\]]*)\]\((https?://[^\)]+)\)", markdown)

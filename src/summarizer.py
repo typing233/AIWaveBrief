@@ -4,7 +4,7 @@ import os
 
 from openai import OpenAI
 
-from .models import ArticleSummary, ScrapedArticle
+from .models import AppConfig, ArticleSummary, ScrapedArticle
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +31,13 @@ EXECUTIVE_SUMMARY_PROMPT = """你是一位 AI 资讯编辑，正在撰写每日�
 
 
 class Summarizer:
-    def __init__(self, config: dict):
+    def __init__(self, config: AppConfig):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        summarization_cfg = config.get("summarization", {})
-        self.model = summarization_cfg.get("model", "gpt-4o")
-        self.max_tokens = summarization_cfg.get("max_tokens_per_summary", 500)
-        self.max_tokens_brief = summarization_cfg.get("max_tokens_brief", 4000)
-        self.temperature = summarization_cfg.get("temperature", 0.3)
-        self.content_max_chars = summarization_cfg.get("content_max_chars", 6000)
+        self.model = config.summarization.model
+        self.max_tokens = config.summarization.max_tokens_per_summary
+        self.max_tokens_brief = config.summarization.max_tokens_brief
+        self.temperature = config.summarization.temperature
+        self.content_max_chars = config.summarization.content_max_chars
 
     def summarize_article(self, article: ScrapedArticle) -> ArticleSummary:
         content = article.content_markdown[: self.content_max_chars]

@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  aiwavebrief:
+    build: .
+    container_name: aiwavebrief
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - TZ=Asia/Shanghai

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from .models import ArticleSummary, BriefSection, DailyBrief
+from .models import AppConfig, ArticleSummary, BriefSection, DailyBrief
 
 CATEGORY_DISPLAY = {
     "research": "研究与论文",
@@ -23,10 +23,8 @@ SOURCE_CATEGORY_MAP = {
 
 
 class BriefGenerator:
-    def __init__(self, config: dict):
-        self.template_path = config.get("output", {}).get(
-            "brief_template", "templates/brief_template.md"
-        )
+    def __init__(self, config: AppConfig):
+        self.template_path = config.output.brief_template
 
     def generate(self, summaries: list[ArticleSummary], executive_summary: str) -> str:
         sections = self._group_by_category(summaries)
