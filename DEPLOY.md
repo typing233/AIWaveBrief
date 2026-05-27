@@ -38,11 +38,11 @@ python main.py --daemon
 cp .env.example .env
 # 编辑 .env 填入必要的 API keys 和推送配置
 
-# 2. 修改 config.yaml 启用调度
-# 设置 schedule.enabled: true
-
-# 3. 一键启动
+# 2. 一键启动（默认每日 08:00 自动执行）
 docker-compose up -d
+
+# 如需关闭定时调度（仅运行一次后退出），设置环境变量：
+# AIWAVEBRIEF_SCHEDULE_ENABLED=false
 
 # 查看日志
 docker-compose logs -f
@@ -152,7 +152,7 @@ output/
 
 | 功能 | 配置项 | 默认 |
 |------|--------|------|
-| 定时调度 | `schedule.enabled` | 关闭 |
+| 定时调度 | `schedule.enabled` | 开启 |
 | 跨次去重 | `dedup.enabled` | 开启 |
 | 邮件推送 | `push.enabled` + channels | 关闭 |
 | 历史存档 | `history.enabled` | 开启 |

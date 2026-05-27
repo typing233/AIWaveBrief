@@ -19,7 +19,7 @@ output:
   brief_template: "templates/brief_template.md"
 
 schedule:
-  enabled: false
+  enabled: true
   time: "08:00"
   timezone: "Asia/Shanghai"
 

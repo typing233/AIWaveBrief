@@ -68,7 +68,7 @@ class OutputConfig(BaseModel):
 
 
 class ScheduleConfig(BaseModel):
-    enabled: bool = False
+    enabled: bool = True
     time: str = "08:00"
     timezone: str = "Asia/Shanghai"
 

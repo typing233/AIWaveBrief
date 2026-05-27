@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlparse
 from firecrawl import FirecrawlApp
 
 from .models import AppConfig, ScrapedArticle, SourceConfig
+from .dedup_store import DedupStore
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,13 @@ RETRIABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class ArticleScraper:
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, dedup_store: DedupStore | None = None):
         self.client = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
         self.max_retries = config.scraping.max_retries
         self.delay = config.scraping.request_delay_seconds
         self.max_articles_per_source = config.scraping.max_articles_per_source
         self.max_workers = config.scraping.max_workers
+        self.dedup_store = dedup_store
         self._domain_locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
         self._domain_last_request: dict[str, float] = {}
 
@@ -59,6 +61,14 @@ class ArticleScraper:
 
         links = self._extract_article_links(index_doc, source)
         logger.info(f"  Found {len(links)} article links from {source.name}")
+
+        # Pre-filter: skip URLs already in dedup store
+        if self.dedup_store:
+            before = len(links)
+            links = [url for url in links if not self.dedup_store.is_url_seen(url)]
+            skipped = before - len(links)
+            if skipped:
+                logger.info(f"  跳过 {skipped} 个已抓取 URL ({source.name})")
 
         articles = []
         for link in links[: self.max_articles_per_source]:

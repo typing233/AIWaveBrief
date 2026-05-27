@@ -31,9 +31,9 @@ def run_pipeline(config: AppConfig) -> RunStats:
             dedup = DedupStore(config.dedup)
             dedup.cleanup_expired()
 
-        # 2. Scrape
+        # 2. Scrape (dedup store passed to scraper for pre-filtering)
         logger.info("开始抓取信息源...")
-        scraper = ArticleScraper(config)
+        scraper = ArticleScraper(config, dedup_store=dedup)
         sources = [s for s in config.sources if s.enabled]
         all_articles = scraper.scrape_all_sources(sources)
         stats.articles_scraped = len(all_articles)
@@ -45,17 +45,14 @@ def run_pipeline(config: AppConfig) -> RunStats:
             stats.errors = errors
             return stats
 
-        # 3. Cross-run dedup
+        # 3. Cross-run title dedup (URLs already filtered pre-scrape)
         if dedup:
             before = len(all_articles)
             all_articles = [
-                a
-                for a in all_articles
-                if not dedup.is_url_seen(a.url)
-                and not dedup.is_title_duplicate(a.title)
+                a for a in all_articles if not dedup.is_title_duplicate(a.title)
             ]
             stats.articles_after_dedup = len(all_articles)
-            logger.info(f"  跨次去重: {before} -> {len(all_articles)} 篇")
+            logger.info(f"  标题去重: {before} -> {len(all_articles)} 篇")
             if not all_articles:
                 logger.info("所有文章均已处理过，无新内容。")
                 stats.errors = errors
@@ -191,9 +188,14 @@ def main():
         return
 
     if args.daemon:
+        logger = logging.getLogger("AIWaveBrief")
+        if not config.schedule.enabled:
+            logger.info("schedule.enabled=false，执行单次运行后退出")
+            run_pipeline(config)
+            return
+
         from src.scheduler import BriefScheduler
 
-        logger = logging.getLogger("AIWaveBrief")
         logger.info("启动定时调度模式...")
         scheduler = BriefScheduler(config, run_pipeline)
         scheduler.start()
