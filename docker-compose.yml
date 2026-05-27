@@ -4,7 +4,7 @@ services:
   aiwavebrief:
     build: .
     container_name: aiwavebrief
-    restart: unless-stopped
+    restart: on-failure
     env_file: .env
     volumes:
       - ./data:/app/data
